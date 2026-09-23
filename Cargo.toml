@@ -1,0 +1,16 @@
+[package]
+name = "rust-data-structures"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitmap = { version = "0.1.0", path = "crates/bitmap" }
+bst = { version = "0.1.0", path = "crates/bst" }
+collection = { version = "0.1.0", path = "crates/collection" }
+queue = { version = "0.1.0", path = "crates/queue" }
+stack = { version = "0.1.0", path = "crates/stack" }
+tree = { version = "0.1.0", path = "crates/tree" }
+
+[workspace]
+members = ["crates/stack", "crates/queue", "crates/collection", "crates/bst", "crates/tree", "crates/bitmap"]
+resolver = "3"
