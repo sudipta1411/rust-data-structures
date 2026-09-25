@@ -7,7 +7,6 @@ pub(super) struct Marker {
     pub(super) literal_words: u64,
 }
 
-#[allow(dead_code)]
 impl Marker {
     pub(super) fn max_uniform_words<W: Word>() -> u64 {
         (1u64 << (W::BITS >> 1 - 1)) - 1
