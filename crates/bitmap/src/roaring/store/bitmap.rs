@@ -8,6 +8,25 @@ fn word_and_mask(value: u16) -> (usize, u64) {
     (word_index, 1u64 << bit_index)
 }
 
+#[inline]
+fn mask_from(bit: u32) -> u64 {
+    u64::MAX << bit
+}
+
+#[inline]
+fn mask_through(bit: u32) -> u64 {
+    if bit == 63 {
+        u64::MAX
+    } else {
+        (1u64 << (bit + 1)) - 1
+    }
+}
+
+#[inline]
+fn mask_between(start_bit: u32, end_bit: u32) -> u64 {
+    mask_from(start_bit) & mask_through(end_bit)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BitmapStore {
     words: Box<[u64; BITMAP_WORDS]>,
@@ -60,18 +79,62 @@ impl BitmapStore {
     }
 
     pub(crate) fn insert_range(&mut self, start: u16, end: u16) -> u32 {
+        assert!(start <= end, "range start must not exceed range end");
+        let first = start as usize / WORD_BITS;
+        let last = end as usize / WORD_BITS;
+        let start_bit = u32::from(start) % u64::BITS;
+        let end_bit = u32::from(end) % u64::BITS;
         let mut added = 0;
-        for value in start..=end {
-            added += u32::from(self.insert(value));
+        if first == last {
+            let old = self.words[first];
+            let new = old | mask_between(start_bit, end_bit);
+            added = new.count_ones() - old.count_ones();
+            self.words[first] = new;
+        } else {
+            let old = self.words[first];
+            let new = old | mask_from(start_bit);
+            added += new.count_ones() - old.count_ones();
+            self.words[first] = new;
+            for word in &mut self.words[first + 1..last] {
+                added += u64::BITS - word.count_ones();
+                *word = u64::MAX;
+            }
+            let old = self.words[last];
+            let new = old | mask_through(end_bit);
+            added += new.count_ones() - old.count_ones();
+            self.words[last] = new;
         }
+        self.cardinality += added;
         added
     }
 
     pub(crate) fn remove_range(&mut self, start: u16, end: u16) -> u32 {
+        assert!(start <= end, "range start must not exceed range end");
+        let first = start as usize / WORD_BITS;
+        let last = end as usize / WORD_BITS;
+        let start_bit = u32::from(start) % u64::BITS;
+        let end_bit = u32::from(end) % u64::BITS;
         let mut removed = 0;
-        for value in start..=end {
-            removed += u32::from(self.remove(value));
+        if first == last {
+            let old = self.words[first];
+            let new = old & !mask_between(start_bit, end_bit);
+            removed = old.count_ones() - new.count_ones();
+            self.words[first] = new;
+        } else {
+            let old = self.words[first];
+            let new = old & !mask_from(start_bit);
+            removed += old.count_ones() - new.count_ones();
+            self.words[first] = new;
+            for word in &mut self.words[first + 1..last] {
+                removed += word.count_ones();
+                *word = 0;
+            }
+            let old = self.words[last];
+            let new = old & !mask_through(end_bit);
+            removed += old.count_ones() - new.count_ones();
+            self.words[last] = new;
         }
+        self.cardinality -= removed;
         removed
     }
 

@@ -26,6 +26,10 @@ impl ArrayStore {
         self.values
     }
 
+    pub(crate) fn values(&self) -> &[u16] {
+        &self.values
+    }
+
     pub(crate) fn len(&self) -> u32 {
         self.values
             .len()
