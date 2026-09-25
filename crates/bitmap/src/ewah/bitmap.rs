@@ -1,6 +1,6 @@
 use super::marker::Marker;
 
-use super::{Decoder, Encoder};
+use super::{Decoder, Encoder, builder::Builder, decoder::WordIter};
 
 use super::super::word::Word;
 
@@ -86,13 +86,20 @@ impl<W: Word> EwahBitmap<W> {
             });
         }
 
-        let mut left = self.to_words();
-        let right = other.to_words();
-
-        for (a, b) in left.iter_mut().zip(right) {
-            *a = operation(*a, b);
+        let mut left = WordIter::new(&self.encoded);
+        let mut right = WordIter::new(&other.encoded);
+        let mut output = Builder::new();
+        loop {
+            match (left.next(), right.next()) {
+                (Some(a), Some(b)) => output.push(operation(a, b)),
+                (None, None) => break,
+                _ => unreachable!("equal-length EWAH bitmaps must decode to equal word counts"),
+            }
         }
-        Ok(Self::from_words(&left))
+        Ok(Self {
+            encoded: output.finish(),
+            bit_len: self.bit_len,
+        })
     }
 
     pub fn and(&self, other: &Self) -> Result<Self, LengthMismatch> {
@@ -112,11 +119,14 @@ impl<W: Word> EwahBitmap<W> {
     }
 
     pub fn not(&self) -> Self {
-        let mut words = self.to_words();
-        for word in &mut words {
-            *word = word.bit_not();
+        let mut output = Builder::new();
+        for word in WordIter::new(&self.encoded) {
+            output.push(word.bit_not());
         }
-        Self::from_words(&words)
+        Self {
+            encoded: output.finish(),
+            bit_len: self.bit_len,
+        }
     }
 
     pub fn nand(&self, other: &Self) -> Result<Self, LengthMismatch> {

@@ -9,11 +9,13 @@ pub(super) struct Marker {
 
 impl Marker {
     pub(super) fn max_uniform_words<W: Word>() -> u64 {
-        (1u64 << (W::BITS >> 1 - 1)) - 1
+        let count_bits = W::BITS / 2 - 1;
+        (1u64 << count_bits) - 1
     }
 
     pub(super) fn max_literal_words<W: Word>() -> u64 {
-        (1u64 << (W::BITS >> 1)) - 1
+        let count_bits = W::BITS / 2;
+        (1u64 << count_bits) - 1
     }
 
     pub(super) fn pack<W: Word>(self) -> W {

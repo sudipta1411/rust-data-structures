@@ -30,6 +30,64 @@ pub struct Decoder<'a, W> {
     encoded: &'a [W],
 }
 
+pub(crate) struct WordIter<'a, W: Word> {
+    encoded: &'a [W],
+    source_index: usize,
+    uniform_value: W,
+    uniform_remaining: usize,
+    literal_remaining: usize,
+}
+
+impl<'a, W: Word> WordIter<'a, W> {
+    pub(crate) fn new(encoded: &'a [W]) -> Self {
+        Self {
+            encoded,
+            source_index: 0,
+            uniform_value: W::ZERO,
+            uniform_remaining: 0,
+            literal_remaining: 0,
+        }
+    }
+    fn load_marker(&mut self) -> bool {
+        let Some(&word) = self.encoded.get(self.source_index) else {
+            return false;
+        };
+        self.source_index += 1;
+        let marker = Marker::unpack(word);
+        self.uniform_value = if marker.uniform_bit { W::ONES } else { W::ZERO };
+        self.uniform_remaining =
+            usize::try_from(marker.uniform_words).expect("uniform count must fit usize");
+        self.literal_remaining =
+            usize::try_from(marker.literal_words).expect("literal count must fit usize");
+        true
+    }
+}
+
+impl<W: Word> Iterator for WordIter<'_, W> {
+    type Item = W;
+    fn next(&mut self) -> Option<W> {
+        loop {
+            if self.uniform_remaining != 0 {
+                self.uniform_remaining -= 1;
+                return Some(self.uniform_value);
+            }
+            if self.literal_remaining != 0 {
+                let word = *self
+                    .encoded
+                    .get(self.source_index)
+                    .expect("internally generated EWAH is valid");
+                self.source_index += 1;
+                self.literal_remaining -= 1;
+                return Some(word);
+            }
+            if !self.load_marker() {
+                return None;
+            }
+        }
+    }
+}
+impl<W: Word> std::iter::FusedIterator for WordIter<'_, W> {}
+
 impl<'a, W: Word> Decoder<'a, W> {
     pub fn new(encoded: &'a [W]) -> Self {
         Self { encoded }

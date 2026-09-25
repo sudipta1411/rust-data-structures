@@ -1,4 +1,5 @@
 mod bitmap;
+mod builder;
 mod decoder;
 mod encoder;
 mod marker;
