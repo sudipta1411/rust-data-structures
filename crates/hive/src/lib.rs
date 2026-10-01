@@ -1,6 +1,6 @@
 use block::Block;
-use handle::Handle;
-use iter::{Iter, IterMut};
+pub use handle::Handle;
+pub use iter::{Iter, IterMut};
 
 mod block;
 mod handle;
@@ -15,6 +15,16 @@ struct Location {
     slot: u32,
 }
 
+// Invariants:
+//
+// 1. Every location in `free` points to a vacant slot.
+// 2. Every vacant slot occurs exactly once in `free`.
+// 3. No occupied slot occurs in `free`.
+// 4. Hive::len equals the number of occupied slots.
+// 5. Block::len equals the number of occupied slots in that block.
+// 6. Existing blocks and slot arrays are never resized.
+// 7. A slot generation changes whenever its value is removed.
+// 8. A Handle is valid only when its block, slot, and generation match an occupied slot.
 pub struct Hive<T> {
     blocks: Vec<Box<Block<T>>>,
     free: Vec<Location>,
