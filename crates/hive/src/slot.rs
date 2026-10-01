@@ -1,5 +1,5 @@
 pub(crate) struct Slot<T> {
-    pub(crate) generation: u32,
+    pub(crate) generation: u64,
     pub(crate) value: Option<T>,
 }
 
@@ -11,7 +11,7 @@ impl<T> Slot<T> {
         }
     }
 
-    pub(crate) fn matches(&self, generation: u32) -> bool {
+    pub(crate) fn matches(&self, generation: u64) -> bool {
         self.generation == generation && self.value.is_some()
     }
 }

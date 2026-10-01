@@ -31,7 +31,7 @@ impl<T> Block<T> {
         self.slots.get_mut(index)
     }
 
-    pub(crate) fn insert(&mut self, index: usize, value: T) -> u32 {
+    pub(crate) fn insert(&mut self, index: usize, value: T) -> u64 {
         let slot = &mut self.slots[index];
         debug_assert!(slot.value.is_none());
         slot.value = Some(value);
@@ -39,7 +39,7 @@ impl<T> Block<T> {
         slot.generation
     }
 
-    pub(crate) fn remove(&mut self, index: usize, generation: u32) -> Option<T> {
+    pub(crate) fn remove(&mut self, index: usize, generation: u64) -> Option<T> {
         let slot = self.slots.get_mut(index)?;
         if !slot.matches(generation) {
             return None;

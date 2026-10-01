@@ -2,7 +2,7 @@
 pub struct Handle {
     pub(crate) block: u32,
     pub(crate) slot: u32,
-    pub(crate) generation: u32,
+    pub(crate) generation: u64,
 }
 
 impl Handle {
@@ -14,7 +14,7 @@ impl Handle {
         self.slot as usize
     }
 
-    pub fn generation(self) -> u32 {
+    pub fn generation(self) -> u64 {
         self.generation
     }
 }
