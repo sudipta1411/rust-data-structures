@@ -19,10 +19,6 @@ impl<T> Block<T> {
         self.slots.len()
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-
     pub(crate) fn slot(&self, index: usize) -> Option<&Slot<T>> {
         self.slots.get(index)
     }
@@ -57,9 +53,5 @@ impl<T> Block<T> {
 
     pub(crate) fn slots_mut(&mut self) -> &mut [Slot<T>] {
         &mut self.slots
-    }
-
-    pub(crate) fn reset_len(&mut self) {
-        self.len = 0
     }
 }

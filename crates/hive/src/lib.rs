@@ -1,8 +1,11 @@
 use block::Block;
+
+pub use drain::Drain;
 pub use handle::Handle;
 pub use iter::{Iter, IterMut};
 
 mod block;
+mod drain;
 mod handle;
 mod iter;
 mod slot;
@@ -55,20 +58,28 @@ impl<T> Hive<T> {
     }
 
     pub fn clear(&mut self) {
-        self.free.clear();
-        for (block_index, block) in self.blocks.iter_mut().enumerate() {
-            for (slot_index, slot) in block.slots_mut().iter_mut().enumerate() {
-                if slot.value.take().is_some() {
-                    slot.generation = slot.generation.wrapping_add(1);
-                }
-                self.free.push(Location {
-                    block: block_index as u32,
-                    slot: slot_index as u32,
-                });
+        //self.drain().for_each(drop);
+        for blk_index in 0..self.blocks.len() {
+            let cap = self.blocks[blk_index].capacity();
+            for slot_index in 0..cap {
+                let generation = {
+                    let slot = self.blocks[blk_index]
+                        .slot(slot_index)
+                        .expect("slot index is valid");
+                    if slot.value.is_none() {
+                        continue;
+                    }
+                    slot.generation
+                };
+
+                let handle = Handle::new(blk_index, slot_index, generation);
+                let value = self
+                    .remove(handle)
+                    .expect("occupied slot must be removable");
+                drop(value);
             }
-            block.reset_len();
         }
-        self.len = 0;
+        debug_assert!(self.is_empty());
     }
 
     pub fn len(&self) -> usize {
@@ -91,6 +102,10 @@ impl<T> Hive<T> {
         self.block_capacity
     }
 
+    pub fn drain(&mut self) -> Drain<'_, T> {
+        Drain::new(self)
+    }
+
     pub fn insert(&mut self, value: T) -> Handle {
         if self.free.is_empty() {
             self.allocate_block();
@@ -102,11 +117,7 @@ impl<T> Hive<T> {
         let block = &mut self.blocks[location.block as usize];
         let generation = block.insert(location.slot as usize, value);
         self.len += 1;
-        Handle {
-            block: location.block,
-            slot: location.slot,
-            generation,
-        }
+        Handle::new(location.block as usize, location.slot as usize, generation)
     }
 
     pub fn get(&self, handle: Handle) -> Option<&T> {
@@ -149,6 +160,42 @@ impl<T> Hive<T> {
 
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         IterMut::new(&mut self.blocks, self.len)
+    }
+
+    pub fn retain<F>(&mut self, mut keep: F)
+    where
+        F: FnMut(Handle, &mut T) -> bool,
+    {
+        for blk_index in 0..self.blocks.len() {
+            let cap = self.blocks[blk_index].capacity();
+            for slot_index in 0..cap {
+                let remove_generation = {
+                    let slot = self.blocks[blk_index]
+                        .slot_mut(slot_index)
+                        .expect("slot index is valid");
+                    let generation = slot.generation;
+                    match slot.value.as_mut() {
+                        Some(value) => {
+                            let handle = Handle::new(blk_index, slot_index, generation);
+                            if keep(handle, value) {
+                                None
+                            } else {
+                                Some(generation)
+                            }
+                        }
+                        None => None,
+                    }
+                };
+
+                if let Some(generation) = remove_generation {
+                    let handle = Handle::new(blk_index, slot_index, generation);
+                    let removed = self
+                        .remove(handle)
+                        .expect("occupied slot must be removable");
+                    drop(removed);
+                }
+            }
+        }
     }
 
     fn allocate_block(&mut self) {

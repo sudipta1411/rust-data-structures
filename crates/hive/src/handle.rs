@@ -6,6 +6,14 @@ pub struct Handle {
 }
 
 impl Handle {
+    pub(crate) fn new(block: usize, slot: usize, generation: u64) -> Self {
+        Self {
+            block: u32::try_from(block).expect("block index exceeds u32::MAX"),
+            slot: u32::try_from(slot).expect("slot index exceeds u32::MAX"),
+            generation,
+        }
+    }
+
     pub fn block(self) -> usize {
         self.block as usize
     }
