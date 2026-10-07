@@ -2,16 +2,18 @@ use super::block::Block;
 use super::slot::Slot;
 
 pub struct Iter<'a, T> {
-    blocks: std::slice::Iter<'a, Box<Block<T>>>,
-    current: Option<std::slice::Iter<'a, Slot<T>>>,
+    blocks: &'a [Box<Block<T>>],
+    block_index: usize,
+    slot_index: usize,
     remaining: usize,
 }
 
 impl<'a, T> Iter<'a, T> {
     pub(crate) fn new(blocks: &'a [Box<Block<T>>], len: usize) -> Self {
         Self {
-            blocks: blocks.iter(),
-            current: None,
+            blocks,
+            block_index: 0,
+            slot_index: 0,
             remaining: len,
         }
     }
@@ -21,18 +23,22 @@ impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some(slots) = &mut self.current {
-                for slot in slots {
-                    if let Some(value) = slot.value.as_ref() {
-                        self.remaining -= 1;
-                        return Some(value);
-                    }
-                }
+        while self.block_index < self.blocks.len() {
+            let blk = &self.blocks[self.block_index];
+            if let Some(index) = blk.next_occupied(self.slot_index) {
+                self.slot_index = index + 1;
+                self.remaining -= 1;
+                blk.debug_assert_consistent(index);
+                return blk
+                    .slot(index)
+                    .expect("occupied slot must exist")
+                    .value
+                    .as_ref();
             }
-            let block = self.blocks.next()?;
-            self.current = Some(block.slots().iter());
+            self.block_index += 1;
+            self.slot_index = 0;
         }
+        None
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

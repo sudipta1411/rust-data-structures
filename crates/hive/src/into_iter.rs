@@ -1,17 +1,16 @@
-use crate::Handle;
+use super::{Handle, Hive};
 
-use super::Hive;
-
-pub struct Drain<'a, T> {
-    hive: &'a mut Hive<T>,
+pub struct IntoIter<T> {
+    hive: Hive<T>,
     block_index: usize,
     slot_index: usize,
     remaining: usize,
 }
 
-impl<'a, T> Drain<'a, T> {
-    pub(crate) fn new(hive: &'a mut Hive<T>) -> Self {
+impl<T> IntoIter<T> {
+    pub(crate) fn new(hive: Hive<T>) -> Self {
         let remaining = hive.len();
+
         Self {
             hive,
             block_index: 0,
@@ -21,30 +20,38 @@ impl<'a, T> Drain<'a, T> {
     }
 }
 
-impl<T> Iterator for Drain<'_, T> {
+impl<T> Iterator for IntoIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
         while self.block_index < self.hive.blocks.len() {
             let occupied = self.hive.blocks[self.block_index].next_occupied(self.slot_index);
+
             let Some(slot_index) = occupied else {
                 self.block_index += 1;
                 self.slot_index = 0;
                 continue;
             };
+
             self.slot_index = slot_index + 1;
+
             let generation = self.hive.blocks[self.block_index]
                 .slot(slot_index)
                 .expect("occupied slot must exist")
                 .generation;
+
             let handle = Handle::new(self.block_index, slot_index, generation);
+
             let value = self
                 .hive
                 .remove(handle)
                 .expect("occupied slot must be removable");
+
             self.remaining -= 1;
+
             return Some(value);
         }
+
         None
     }
 
@@ -53,14 +60,6 @@ impl<T> Iterator for Drain<'_, T> {
     }
 }
 
-impl<T> ExactSizeIterator for Drain<'_, T> {}
+impl<T> ExactSizeIterator for IntoIter<T> {}
 
-impl<T> std::iter::FusedIterator for Drain<'_, T> {}
-
-impl<T> Drop for Drain<'_, T> {
-    fn drop(&mut self) {
-        while let Some(value) = self.next() {
-            drop(value);
-        }
-    }
-}
+impl<T> std::iter::FusedIterator for IntoIter<T> {}

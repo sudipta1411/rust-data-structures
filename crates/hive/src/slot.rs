@@ -14,4 +14,8 @@ impl<T> Slot<T> {
     pub(crate) fn matches(&self, generation: u64) -> bool {
         self.generation == generation && self.value.is_some()
     }
+
+    pub(crate) fn generation_matches(&self, generation: u64) -> bool {
+        self.generation == generation
+    }
 }
